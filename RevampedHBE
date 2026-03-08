@@ -1,19 +1,17 @@
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Settings
-local TOGGLE_KEY = Enum.KeyCode.LeftControl
 local HEAD_SIZE = 8
-local enabled = true
+local CHECK_DELAY = 0.0200
+local MAX_DISTANCE = 800
 
 local originalProps = {}
 local espObjects = {}
 
--- save original
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
 local function saveOriginal(hrp)
 	if not originalProps[hrp] then
 		originalProps[hrp] = {
@@ -26,11 +24,9 @@ local function saveOriginal(hrp)
 	end
 end
 
--- restore
 local function restoreOriginal(hrp, player)
-	if originalProps[hrp] then
-		local props = originalProps[hrp]
-
+	local props = originalProps[hrp]
+	if props then
 		hrp.Size = props.Size
 		hrp.Transparency = props.Transparency
 		hrp.BrickColor = props.BrickColor
@@ -44,7 +40,6 @@ local function restoreOriginal(hrp, player)
 	end
 end
 
--- apply hbe
 local function applyTo(hrp, player)
 	saveOriginal(hrp)
 
@@ -58,96 +53,75 @@ local function applyTo(hrp, player)
 		local highlight = Instance.new("Highlight")
 		highlight.Adornee = hrp
 		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-		highlight.FillColor = Color3.fromRGB(0,150,255)
 		highlight.FillTransparency = 0.5
-		highlight.OutlineTransparency = 0
 		highlight.Parent = hrp
-
 		espObjects[player] = highlight
 	end
 end
 
--- visibility check
 local function isVisible(character)
 
-	local ignore = {LocalPlayer.Character}
+	local head = character:FindFirstChild("Head")
+	local hrp = character:FindFirstChild("HumanoidRootPart")
 
-	local points = {}
-
-	for _,part in pairs(character:GetChildren()) do
-		if part:IsA("BasePart") then
-			table.insert(points, part.Position)
-		end
+	if not head or not hrp then
+		return false
 	end
 
-	for _,point in ipairs(points) do
+	rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
 
-		local direction = point - Camera.CFrame.Position
+	local camPos = Camera.CFrame.Position
 
-		local rayParams = RaycastParams.new()
-		rayParams.FilterDescendantsInstances = ignore
-		rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+	local function check(part)
+		local direction = part.Position - camPos
+		local result = workspace:Raycast(camPos, direction, rayParams)
 
-		local result = workspace:Raycast(Camera.CFrame.Position, direction, rayParams)
-
-		if result then
-			if result.Instance:IsDescendantOf(character) then
-				return true
-			end
-		else
+		if result and result.Instance:IsDescendantOf(character) then
 			return true
 		end
 
+		return false
 	end
 
-	return false
+	return check(head) or check(hrp)
 end
 
--- main visibility loop
-RunService.RenderStepped:Connect(function()
+task.spawn(function()
 
-	if not enabled then return end
+	while true do
 
-	for _,player in pairs(Players:GetPlayers()) do
+		for _,player in pairs(Players:GetPlayers()) do
 
-		if player ~= LocalPlayer then
-
-			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			if player ~= LocalPlayer and player.Character then
 
 				if LocalPlayer.Team and player.Team == LocalPlayer.Team then
 					continue
 				end
 
-				local hrp = player.Character.HumanoidRootPart
+				local hrp = player.Character:FindFirstChild("HumanoidRootPart")
 
-				if isVisible(player.Character) then
-					applyTo(hrp,player)
-				else
-					restoreOriginal(hrp,player)
+				if hrp then
+
+					local distance = (hrp.Position - Camera.CFrame.Position).Magnitude
+
+					if distance < MAX_DISTANCE then
+
+						if isVisible(player.Character) then
+							applyTo(hrp,player)
+						else
+							restoreOriginal(hrp,player)
+						end
+
+					end
+
 				end
 
 			end
 
 		end
 
+		task.wait(CHECK_DELAY)
+
 	end
 
-end)
-
--- toggle
-UserInputService.InputBegan:Connect(function(input,processed)
-	if processed then return end
-
-	if input.KeyCode == TOGGLE_KEY then
-		enabled = not enabled
-
-		if not enabled then
-			for player,esp in pairs(espObjects) do
-				local char = player.Character
-				if char and char:FindFirstChild("HumanoidRootPart") then
-					restoreOriginal(char.HumanoidRootPart,player)
-				end
-			end
-		end
-	end
 end)
