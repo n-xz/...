@@ -1,0 +1,127 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local HEAD_SIZE = 8
+local CHECK_DELAY = 0.0200
+local MAX_DISTANCE = 800
+
+local originalProps = {}
+local espObjects = {}
+
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+local function saveOriginal(hrp)
+	if not originalProps[hrp] then
+		originalProps[hrp] = {
+			Size = hrp.Size,
+			Transparency = hrp.Transparency,
+			BrickColor = hrp.BrickColor,
+			Material = hrp.Material,
+			CanCollide = hrp.CanCollide
+		}
+	end
+end
+
+local function restoreOriginal(hrp, player)
+	local props = originalProps[hrp]
+	if props then
+		hrp.Size = props.Size
+		hrp.Transparency = props.Transparency
+		hrp.BrickColor = props.BrickColor
+		hrp.Material = props.Material
+		hrp.CanCollide = props.CanCollide
+	end
+
+	if espObjects[player] then
+		espObjects[player]:Destroy()
+		espObjects[player] = nil
+	end
+end
+
+local function applyTo(hrp, player)
+	saveOriginal(hrp)
+
+	hrp.Size = Vector3.new(HEAD_SIZE,HEAD_SIZE,HEAD_SIZE)
+	hrp.Transparency = 1
+	hrp.BrickColor = BrickColor.new("Bright red")
+	hrp.Material = Enum.Material.Neon
+	hrp.CanCollide = false
+
+	if not espObjects[player] then
+		local highlight = Instance.new("Highlight")
+		highlight.Adornee = hrp
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.FillTransparency = 1
+		highlight.Parent = hrp
+		espObjects[player] = highlight
+	end
+end
+
+local function isVisible(character)
+
+	local head = character:FindFirstChild("Head")
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+
+	if not head or not hrp then
+		return false
+	end
+
+	rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+
+	local camPos = Camera.CFrame.Position
+
+	local function check(part)
+		local direction = part.Position - camPos
+		local result = workspace:Raycast(camPos, direction, rayParams)
+
+		if result and result.Instance:IsDescendantOf(character) then
+			return true
+		end
+
+		return false
+	end
+
+	return check(head) or check(hrp)
+end
+
+task.spawn(function()
+
+	while true do
+
+		for _,player in pairs(Players:GetPlayers()) do
+
+			if player ~= LocalPlayer and player.Character then
+
+				if LocalPlayer.Team and player.Team == LocalPlayer.Team then
+					continue
+				end
+
+				local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+
+				if hrp then
+
+					local distance = (hrp.Position - Camera.CFrame.Position).Magnitude
+
+					if distance < MAX_DISTANCE then
+
+						if isVisible(player.Character) then
+							applyTo(hrp,player)
+						else
+							restoreOriginal(hrp,player)
+						end
+
+					end
+
+				end
+
+			end
+
+		end
+
+		task.wait(CHECK_DELAY)
+
+	end
+
+end)
