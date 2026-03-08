@@ -1,0 +1,78 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local espEnabled = false
+local highlights = {}
+
+-- Function to check if player is enemy
+local function isEnemy(player)
+	if not LocalPlayer.Team or not player.Team then
+		return true -- If no teams exist, treat everyone as enemy
+	end
+	
+	return player.Team ~= LocalPlayer.Team
+end
+
+-- Function to add highlight
+local function addHighlight(player)
+	if player == LocalPlayer then return end
+	if not player.Character then return end
+	if not isEnemy(player) then return end -- Team check added
+	
+	local highlight = Instance.new("Highlight")
+	highlight.FillColor = Color3.fromRGB(255, 0, 0)
+	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = player.Character
+	
+	highlights[player] = highlight
+end
+
+-- Function to remove highlight
+local function removeHighlight(player)
+	if highlights[player] then
+		highlights[player]:Destroy()
+		highlights[player] = nil
+	end
+end
+
+-- Toggle function
+local function toggleESP()
+	espEnabled = not espEnabled
+	
+	for _, player in pairs(Players:GetPlayers()) do
+		if espEnabled then
+			addHighlight(player)
+		else
+			removeHighlight(player)
+		end
+	end
+end
+
+-- Update when players join
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function()
+		if espEnabled then
+			addHighlight(player)
+		end
+	end)
+end)
+
+-- Optional: Update highlights if teams change
+Players.PlayerAdded:Connect(function(player)
+	player:GetPropertyChangedSignal("Team"):Connect(function()
+		removeHighlight(player)
+		if espEnabled then
+			addHighlight(player)
+		end
+	end)
+end)
+
+-- Example toggle keybind (press "H")
+local UserInputService = game:GetService("UserInputService")
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.H then
+		toggleESP()
+	end
+end)
