@@ -3,7 +3,7 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local HEAD_SIZE = 8
-local CHECK_DELAY = 0.0200
+local CHECK_DELAY = 0.0500
 local MAX_DISTANCE = 800
 
 local originalProps = {}
