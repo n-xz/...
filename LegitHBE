@@ -216,4 +216,3 @@ LocalPlayer.CharacterAdded:Connect(function()
 	task.wait(1)
 	setupDeath()
 end)
-m.txt
