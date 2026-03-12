@@ -1,16 +1,33 @@
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
+
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local HEAD_SIZE = 8
-local CHECK_DELAY = 0.0500
+local CHECK_DELAY = 0.1
 local MAX_DISTANCE = 800
+
+local TOGGLE_KEY = Enum.KeyCode.H
+
+local enabled = false
 
 local originalProps = {}
 local espObjects = {}
 
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+local function notify(text)
+	pcall(function()
+		StarterGui:SetCore("SendNotification",{
+			Title = "System",
+			Text = text,
+			Duration = 2
+		})
+	end)
+end
 
 local function saveOriginal(hrp)
 	if not originalProps[hrp] then
@@ -25,7 +42,9 @@ local function saveOriginal(hrp)
 end
 
 local function restoreOriginal(hrp, player)
+
 	local props = originalProps[hrp]
+
 	if props then
 		hrp.Size = props.Size
 		hrp.Transparency = props.Transparency
@@ -40,7 +59,29 @@ local function restoreOriginal(hrp, player)
 	end
 end
 
+local function restoreAll()
+
+	for player,highlight in pairs(espObjects) do
+		if highlight then
+			highlight:Destroy()
+		end
+	end
+
+	for hrp,props in pairs(originalProps) do
+		if hrp then
+			hrp.Size = props.Size
+			hrp.Transparency = props.Transparency
+			hrp.BrickColor = props.BrickColor
+			hrp.Material = props.Material
+			hrp.CanCollide = props.CanCollide
+		end
+	end
+
+	espObjects = {}
+end
+
 local function applyTo(hrp, player)
+
 	saveOriginal(hrp)
 
 	hrp.Size = Vector3.new(HEAD_SIZE,HEAD_SIZE,HEAD_SIZE)
@@ -73,6 +114,7 @@ local function isVisible(character)
 	local camPos = Camera.CFrame.Position
 
 	local function check(part)
+
 		local direction = part.Position - camPos
 		local result = workspace:Raycast(camPos, direction, rayParams)
 
@@ -90,26 +132,30 @@ task.spawn(function()
 
 	while true do
 
-		for _,player in pairs(Players:GetPlayers()) do
+		if enabled then
 
-			if player ~= LocalPlayer and player.Character then
+			for _,player in pairs(Players:GetPlayers()) do
 
-				if LocalPlayer.Team and player.Team == LocalPlayer.Team then
-					continue
-				end
+				if player ~= LocalPlayer and player.Character then
 
-				local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+					if LocalPlayer.Team and player.Team == LocalPlayer.Team then
+						continue
+					end
 
-				if hrp then
+					local hrp = player.Character:FindFirstChild("HumanoidRootPart")
 
-					local distance = (hrp.Position - Camera.CFrame.Position).Magnitude
+					if hrp then
 
-					if distance < MAX_DISTANCE then
+						local distance = (hrp.Position - Camera.CFrame.Position).Magnitude
 
-						if isVisible(player.Character) then
-							applyTo(hrp,player)
-						else
-							restoreOriginal(hrp,player)
+						if distance < MAX_DISTANCE then
+
+							if isVisible(player.Character) then
+								applyTo(hrp,player)
+							else
+								restoreOriginal(hrp,player)
+							end
+
 						end
 
 					end
@@ -125,3 +171,49 @@ task.spawn(function()
 	end
 
 end)
+
+UserInputService.InputBegan:Connect(function(input,gameProcessed)
+
+	if gameProcessed then return end
+
+	if input.KeyCode == TOGGLE_KEY then
+
+		enabled = not enabled
+
+		if enabled then
+			notify("e")
+		else
+			notify("d")
+			restoreAll()
+		end
+
+	end
+
+end)
+
+local function setupDeath()
+
+	local character = LocalPlayer.Character
+	if not character then return end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+	if humanoid then
+		humanoid.Died:Connect(function()
+			enabled = false
+			restoreAll()
+			notify("d")
+		end)
+	end
+
+end
+
+if LocalPlayer.Character then
+	setupDeath()
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+	task.wait(1)
+	setupDeath()
+end)
+m.txt
