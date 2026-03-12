@@ -5,11 +5,11 @@ local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
-local HEAD_SIZE = 8
+local HEAD_SIZE = 6
 local CHECK_DELAY = 0.1
 local MAX_DISTANCE = 800
 
-local TOGGLE_KEY = Enum.KeyCode.H
+local TOGGLE_KEY = Enum.KeyCode.LeftControl
 
 local enabled = false
 
